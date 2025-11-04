@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 // In-memory storage for signaling messages (in production, use Redis or a database)
 const signalingStore: Map<string, Array<{
-	type: 'offer' | 'answer' | 'ice-candidate' | 'join' | 'leave' | 'timer-start' | 'timer-pause' | 'timer-resume' | 'timer-reset';
+	type: 'offer' | 'answer' | 'ice-candidate' | 'join' | 'leave' | 'timer-start' | 'timer-pause' | 'timer-resume' | 'timer-reset' | 'create-session';
 	from: string;
 	to?: string;
 	data: any;
