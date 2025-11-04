@@ -215,13 +215,14 @@ export default function Dashboard() {
 				<div className="flex items-center gap-3 mb-4 justify-center">
 					<Video className="w-6 h-6 text-gray-900 dark:text-white" />
 					<h2 className="text-2xl font-bold text-gray-900 dark:text-white">Live Sessions</h2>
+					<span className="px-3 py-1 bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 text-xs font-semibold rounded-full border border-yellow-500/30">
+						Coming Soon
+					</span>
 				</div>
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
-					<Link href="/live/create">
+				<div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto relative">
+					<div className="relative opacity-60 cursor-not-allowed">
 						<motion.div
-							whileHover={{ scale: 1.02, y: -2 }}
-							whileTap={{ scale: 0.98 }}
-							className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 border-2 border-purple-400/30 rounded-2xl p-6 cursor-pointer hover:border-purple-400/50 transition-all"
+							className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 border-2 border-purple-400/30 rounded-2xl p-6 transition-all"
 						>
 							<div className="flex items-center gap-3 mb-2">
 								<div className="w-10 h-10 bg-purple-500/20 rounded-full flex items-center justify-center">
@@ -231,12 +232,10 @@ export default function Dashboard() {
 							</div>
 							<p className="text-gray-700 dark:text-gray-300 text-sm">Create and lead a live meditation session for your community</p>
 						</motion.div>
-					</Link>
-					<Link href="/live/join">
+					</div>
+					<div className="relative opacity-60 cursor-not-allowed">
 						<motion.div
-							whileHover={{ scale: 1.02, y: -2 }}
-							whileTap={{ scale: 0.98 }}
-							className="bg-gradient-to-br from-blue-600/20 to-purple-600/20 border-2 border-blue-400/30 rounded-2xl p-6 cursor-pointer hover:border-blue-400/50 transition-all"
+							className="bg-gradient-to-br from-blue-600/20 to-purple-600/20 border-2 border-blue-400/30 rounded-2xl p-6 transition-all"
 						>
 							<div className="flex items-center gap-3 mb-2">
 								<div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
@@ -246,7 +245,7 @@ export default function Dashboard() {
 							</div>
 							<p className="text-gray-700 dark:text-gray-300 text-sm">Enter a session ID to join a live meditation with others</p>
 						</motion.div>
-					</Link>
+					</div>
 				</div>
 			</motion.div>
 
