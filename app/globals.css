@@ -1,0 +1,127 @@
+@layer theme, base, frosted_ui, components, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "@whop/react/styles.css" layer(frosted_ui);
+
+/* biome-ignore lint/suspicious/noUnknownAtRules: this rule is imported from whop */
+@config '../tailwind.config.ts';
+
+body {
+	background: var(--background);
+	color: var(--foreground);
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+	transition: background-image 0.5s ease, background-color 0.5s ease;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+/* Light mode text colors */
+:root:not(.dark) {
+	--foreground: #000000;
+	color: #000000;
+}
+
+:root:not(.dark) .text-gray-12,
+:root:not(.dark) .text-gray-11,
+:root:not(.dark) .text-gray-10,
+:root:not(.dark) .text-gray-9 {
+	color: #000000 !important;
+}
+
+:root:not(.dark) h1,
+:root:not(.dark) h2,
+:root:not(.dark) h3,
+:root:not(.dark) p,
+:root:not(.dark) span,
+:root:not(.dark) div:not([class*="bg-"]) {
+	color: #000000;
+}
+
+/* Override white text colors in light mode - make them dark */
+:root:not(.dark) .text-white {
+	color: #000000 !important;
+}
+
+:root:not(.dark) .text-white\/90,
+:root:not(.dark) .text-white\/80,
+:root:not(.dark) .text-white\/70 {
+	color: #1a1a1a !important;
+}
+
+/* Override gray text colors in light mode - make them darker */
+:root:not(.dark) .text-gray-400 {
+	color: #4b5563 !important;
+}
+
+:root:not(.dark) .text-gray-300 {
+	color: #374151 !important;
+}
+
+:root:not(.dark) .text-gray-500 {
+	color: #6b7280 !important;
+}
+
+:root:not(.dark) .text-gray-600 {
+	color: #4b5563 !important;
+}
+
+/* Override text colors for paywall modal and pages with dark gradient backgrounds - force white text */
+/* Target elements inside paywall */
+:root:not(.dark) [data-paywall] .text-white,
+:root:not(.dark) [data-paywall] .text-white\/90,
+:root:not(.dark) [data-paywall] .text-white\/80,
+:root:not(.dark) [data-paywall] .text-white\/70 {
+	color: white !important;
+}
+
+/* Target elements inside dark gradient containers (timer, tracker, settings, courses, etc.) */
+:root:not(.dark) [class*="bg-gradient-to-br"][class*="from-purple-600"] .text-white,
+:root:not(.dark) [class*="bg-gradient-to-br"][class*="from-pink-600"] .text-white,
+:root:not(.dark) [class*="bg-gradient-to-br"][class*="from-blue-800"] .text-white,
+:root:not(.dark) [class*="bg-gradient-to-br"][class*="from-indigo-600"] .text-white,
+:root:not(.dark) [class*="bg-gradient-to-br"][class*="from-sky-900"] .text-white,
+:root:not(.dark) [class*="bg-gradient-to-b"][class*="from-purple-600"] .text-white,
+:root:not(.dark) [class*="bg-gradient-to-b"][class*="from-pink-600"] .text-white,
+:root:not(.dark) [class*="bg-gradient-to-b"][class*="from-blue-800"] .text-white {
+	color: white !important;
+}
+
+/* Target elements on pages with fixed gradient backgrounds (anxiety, soothing sounds) */
+:root:not(.dark) [class*="fixed"][class*="inset-0"][class*="bg-gradient"] ~ * .text-white,
+:root:not(.dark) [class*="fixed"][class*="inset-0"][class*="from-blue-500"] ~ * .text-white,
+:root:not(.dark) [class*="fixed"][class*="inset-0"][class*="from-purple-500"] ~ * .text-white {
+	color: white !important;
+}
+
+/* Set light mode background to white */
+:root:not(.dark) body,
+html:not(.dark) body {
+	background-color: #ffffff !important;
+}
+
+/* Dark mode default for this app - matching image color */
+html,
+body {
+	background-color: #1A1A1A !important;
+}
+
+/* Ensure all pages use the same background */
+#__next,
+[data-whop-app] {
+	background-color: #1A1A1A !important;
+}
+
+/* Add overlay for better text readability on background images */
+body::before {
+	content: "";
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.2);
+	pointer-events: none;
+	z-index: -1;
+}
