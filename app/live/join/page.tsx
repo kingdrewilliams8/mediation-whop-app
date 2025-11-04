@@ -10,27 +10,57 @@ import Link from "next/link";
 export default function JoinLiveSessionPage() {
 	const router = useRouter();
 	const [sessionId, setSessionId] = useState("");
+	const [participantName, setParticipantName] = useState("");
 	const [error, setError] = useState("");
+	const [isJoining, setIsJoining] = useState(false);
 
-	const handleJoinSession = () => {
+	const handleJoinSession = async () => {
 		if (!sessionId.trim()) {
 			setError("Please enter a session ID");
 			return;
 		}
 
-		// Check if session exists (in production, this would check a database)
-		const sessionData = localStorage.getItem(`live_session_${sessionId}`);
-		
-		if (!sessionData) {
-			setError("Session not found. Please check the session ID and try again.");
+		if (!participantName.trim()) {
+			setError("Please enter your name");
 			return;
 		}
 
-		// Store current session ID for the participant
-		localStorage.setItem("current_participant_session", sessionId);
-		
-		// Navigate to the live session room
-		router.push(`/live/${sessionId}`);
+		setIsJoining(true);
+		setError("");
+
+		try {
+			// Check if session exists via API (for cross-device access)
+			const response = await fetch(`/api/signaling?sessionId=${sessionId}&checkSession=true`);
+			
+			if (!response.ok) {
+				if (response.status === 404) {
+					setError("Session not found. Please check the session ID and try again.");
+				} else {
+					setError("Failed to join session. Please try again.");
+				}
+				setIsJoining(false);
+				return;
+			}
+
+			const result = await response.json();
+			
+			if (!result.exists || !result.session) {
+				setError("Session not found. Please check the session ID and try again.");
+				setIsJoining(false);
+				return;
+			}
+
+			// Store current session ID and participant name
+			localStorage.setItem("current_participant_session", sessionId);
+			localStorage.setItem(`participant_name_${sessionId}`, participantName);
+			
+			// Navigate to the live session room
+			router.push(`/live/${sessionId}`);
+		} catch (error) {
+			console.error("Error joining session:", error);
+			setError("Failed to join session. Please try again.");
+			setIsJoining(false);
+		}
 	};
 
 	return (
@@ -57,14 +87,31 @@ export default function JoinLiveSessionPage() {
 							Join Live Session
 						</h1>
 					</div>
-					<p className="text-gray-10">Enter the session ID provided by your host</p>
+					<p className="text-gray-700 dark:text-gray-300">Enter your name and the session ID provided by your host</p>
 				</div>
 
 				<div className="bg-gradient-to-br from-blue-600/20 to-purple-600/20 border-2 border-blue-400/30 rounded-2xl p-8 shadow-xl">
 					<div className="space-y-6">
+						{/* Participant Name Input */}
+						<div>
+							<label className="block text-sm font-semibold mb-2 text-gray-900 dark:text-gray-100">
+								Your Name *
+							</label>
+							<input
+								type="text"
+								value={participantName}
+								onChange={(e) => {
+									setParticipantName(e.target.value);
+									setError("");
+								}}
+								placeholder="Enter your name"
+								className="w-full px-4 py-3 rounded-xl border-2 border-blue-400/30 bg-white/5 backdrop-blur-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/50"
+							/>
+						</div>
+
 						{/* Session ID Input */}
 						<div>
-							<label className="block text-sm font-semibold mb-2 text-gray-11">
+							<label className="block text-sm font-semibold mb-2 text-gray-900 dark:text-gray-100">
 								Session ID *
 							</label>
 							<input
@@ -75,7 +122,7 @@ export default function JoinLiveSessionPage() {
 									setError("");
 								}}
 								placeholder="Enter session ID"
-								className="w-full px-4 py-3 rounded-xl border-2 border-blue-400/30 bg-white/5 backdrop-blur-sm text-gray-12 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/50"
+								className="w-full px-4 py-3 rounded-xl border-2 border-blue-400/30 bg-white/5 backdrop-blur-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/50"
 							/>
 							{error && (
 								<div className="mt-2 flex items-center gap-2 text-red-400 text-sm">
@@ -88,9 +135,9 @@ export default function JoinLiveSessionPage() {
 						{/* Info Card */}
 						<div className="bg-blue-500/10 border border-blue-400/30 rounded-xl p-4 flex items-start gap-3">
 							<Video className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
-							<div className="text-sm text-gray-11">
+							<div className="text-sm text-gray-900 dark:text-gray-100">
 								<p className="font-semibold mb-1">Ready to meditate together?</p>
-								<p className="text-gray-10">
+								<p className="text-gray-700 dark:text-gray-300">
 									Get the session ID from your host. Once you join, you'll be able to see and hear other participants while meditating together.
 								</p>
 							</div>
@@ -102,9 +149,10 @@ export default function JoinLiveSessionPage() {
 							variant="classic"
 							size="4"
 							className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-bold py-3 rounded-xl shadow-lg"
+							disabled={isJoining}
 						>
 							<Users className="w-5 h-5 mr-2" />
-							Join Session
+							{isJoining ? "Joining..." : "Join Session"}
 						</Button>
 					</div>
 				</div>

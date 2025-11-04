@@ -9,6 +9,17 @@ const signalingStore: Map<string, Array<{
 	timestamp: number;
 }>> = new Map();
 
+// In-memory storage for session metadata
+const sessionStore: Map<string, {
+	id: string;
+	name: string;
+	description: string;
+	duration: number;
+	hostId: string;
+	createdAt: string;
+	participants: string[];
+}> = new Map();
+
 // Clean up old messages (older than 30 seconds)
 const cleanupOldMessages = () => {
 	const now = Date.now();
@@ -35,6 +46,19 @@ export async function POST(request: NextRequest) {
 				{ error: "Missing required fields" },
 				{ status: 400 }
 			);
+		}
+
+		// Handle session creation/update (sessionData is inside data object when host joins)
+		if (type === 'join' && data?.isHost && data?.sessionData) {
+			sessionStore.set(sessionId, {
+				id: data.sessionData.id || sessionId,
+				name: data.sessionData.name,
+				description: data.sessionData.description || "",
+				duration: data.sessionData.duration || 10,
+				hostId: data.sessionData.hostId || from,
+				createdAt: data.sessionData.createdAt || new Date().toISOString(),
+				participants: [from],
+			});
 		}
 
 		// Initialize session if it doesn't exist
@@ -71,6 +95,19 @@ export async function GET(request: NextRequest) {
 		const sessionId = searchParams.get("sessionId");
 		const userId = searchParams.get("userId");
 		const lastTimestamp = searchParams.get("lastTimestamp");
+		const checkSession = searchParams.get("checkSession");
+
+		// Check if session exists (for joining from another device)
+		if (checkSession === "true" && sessionId) {
+			const session = sessionStore.get(sessionId);
+			if (!session) {
+				return NextResponse.json(
+					{ error: "Session not found" },
+					{ status: 404 }
+				);
+			}
+			return NextResponse.json({ session, exists: true });
+		}
 
 		if (!sessionId || !userId) {
 			return NextResponse.json(

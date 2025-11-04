@@ -13,7 +13,7 @@ export default function CreateLiveSessionPage() {
 	const [description, setDescription] = useState("");
 	const [duration, setDuration] = useState(10);
 
-	const handleCreateSession = () => {
+	const handleCreateSession = async () => {
 		if (!sessionName.trim()) {
 			alert("Please enter a session name");
 			return;
@@ -22,7 +22,7 @@ export default function CreateLiveSessionPage() {
 		// Generate a unique session ID
 		const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 		
-		// Store session info in localStorage (in production, this would be stored in a database)
+		// Store session info in localStorage (for local reference)
 		const sessionData = {
 			id: sessionId,
 			name: sessionName,
@@ -35,6 +35,9 @@ export default function CreateLiveSessionPage() {
 		
 		localStorage.setItem(`live_session_${sessionId}`, JSON.stringify(sessionData));
 		localStorage.setItem("current_host_session", sessionId);
+		
+		// Store session data in API for cross-device access
+		// This will be handled when the host joins in the live session page
 		
 		// Navigate to the live session room
 		router.push(`/live/${sessionId}`);

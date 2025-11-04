@@ -73,39 +73,77 @@ export default function LiveSessionPage() {
 
 	// Initialize session
 	useEffect(() => {
-		// Load session data from localStorage
-		const stored = localStorage.getItem(`live_session_${sessionId}`);
-		const hostSession = localStorage.getItem("current_host_session");
-		
-		if (stored) {
-			const data = JSON.parse(stored);
-			setSessionData(data);
-			setDuration(data.duration || 10);
-			setTimeLeft((data.duration || 10) * 60);
-			const host = hostSession === sessionId;
-			setIsHost(host);
+		const initializeSession = async () => {
+			const hostSession = localStorage.getItem("current_host_session");
+			const isHost = hostSession === sessionId;
 			
 			// Generate unique user ID
 			userIdRef.current = generateUserId();
 			
-			// Initialize self as participant
-			const self: Participant = {
-				id: userIdRef.current,
-				name: host ? "Host (You)" : "You",
-				isHost: host,
-				isVideoEnabled: true,
-				isAudioEnabled: true,
-			};
-			setParticipants([self]);
+			// Get participant name (for non-hosts)
+			let participantName = "Participant";
+			if (!isHost) {
+				const storedName = localStorage.getItem(`participant_name_${sessionId}`);
+				if (storedName) {
+					participantName = storedName;
+				}
+			}
 			
-			// Send join message
-			sendSignalingMessage(sessionId, "join", userIdRef.current, undefined, {
-				name: host ? "Host" : "Participant",
-				isHost: host,
-			});
-		} else {
-			router.push("/live/join");
-		}
+			// Try to load session data from localStorage first
+			const stored = localStorage.getItem(`live_session_${sessionId}`);
+			let sessionData = stored ? JSON.parse(stored) : null;
+			
+			// If not found in localStorage, try to fetch from API (for cross-device)
+			if (!sessionData) {
+				try {
+					const response = await fetch(`/api/signaling?sessionId=${sessionId}&checkSession=true`);
+					if (response.ok) {
+						const result = await response.json();
+						if (result.session) {
+							sessionData = result.session;
+						}
+					}
+				} catch (error) {
+					console.error("Error fetching session data:", error);
+				}
+			}
+			
+			if (sessionData) {
+				setSessionData(sessionData);
+				setDuration(sessionData.duration || 10);
+				setTimeLeft((sessionData.duration || 10) * 60);
+				setIsHost(isHost);
+				
+				// Initialize self as participant
+				const self: Participant = {
+					id: userIdRef.current,
+					name: isHost ? "Host (You)" : participantName,
+					isHost: isHost,
+					isVideoEnabled: true,
+					isAudioEnabled: true,
+				};
+				setParticipants([self]);
+				
+				// Send join message with session data for host
+				if (isHost) {
+					await sendSignalingMessage(sessionId, "join", userIdRef.current, undefined, {
+						name: "Host",
+						isHost: true,
+						sessionData: sessionData,
+					});
+				} else {
+					await sendSignalingMessage(sessionId, "join", userIdRef.current, undefined, {
+						name: participantName,
+						isHost: false,
+					});
+				}
+			} else {
+				// Session not found, redirect to join page
+				router.push("/live/join");
+			}
+		};
+		
+		initializeSession();
 	}, [sessionId, router]);
 
 	// Initialize media and WebRTC
@@ -211,14 +249,14 @@ export default function LiveSessionPage() {
 
 	// Handle new participant joining
 	const handleParticipantJoin = async (participantId: string, data: any) => {
-		// Add participant to list
+		// Add participant to list with their name
 		setParticipants((prev) => {
 			if (prev.find((p) => p.id === participantId)) return prev;
 			return [
 				...prev,
 				{
 					id: participantId,
-					name: data.name || "Participant",
+					name: data.name || `Participant ${participantId.slice(-6)}`,
 					isHost: data.isHost || false,
 					isVideoEnabled: true,
 					isAudioEnabled: true,
