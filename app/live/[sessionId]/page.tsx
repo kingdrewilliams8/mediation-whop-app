@@ -322,15 +322,21 @@ export default function LiveSessionPage() {
 			);
 
 			// Add local stream tracks
-			if (localStreamRef.current) {
+			if (localStreamRef.current && pc) {
 				localStreamRef.current.getTracks().forEach((track) => {
-					if (localStreamRef.current) {
+					if (localStreamRef.current && pc) {
 						pc.addTrack(track, localStreamRef.current);
 					}
 				});
 			}
 
 			peerConnectionsRef.current.set(from, pc);
+		}
+
+		// Ensure pc is defined before using it
+		if (!pc) {
+			console.error("Failed to create peer connection");
+			return;
 		}
 
 		try {
