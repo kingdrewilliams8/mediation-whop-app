@@ -54,6 +54,7 @@ export default function LiveSessionPage() {
 	const localVideoRef = useRef<HTMLVideoElement>(null);
 	const localStreamRef = useRef<MediaStream | null>(null);
 	const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
+	const remoteStreamsRef = useRef<Map<string, MediaStream>>(new Map()); // Store remote streams
 	const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
 	
 	// Signaling state
@@ -67,6 +68,10 @@ export default function LiveSessionPage() {
 	const [duration, setDuration] = useState(10);
 	const [selectedRingtone, setSelectedRingtone] = useState("bell");
 	const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+	// Countdown state
+	const [countdown, setCountdown] = useState<number | null>(null);
+	const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
 	// UI state
 	const [copied, setCopied] = useState(false);
@@ -215,7 +220,7 @@ export default function LiveSessionPage() {
 
 	// Handle incoming signaling messages
 	const handleSignalingMessage = async (message: {
-		type: 'offer' | 'answer' | 'ice-candidate' | 'join' | 'leave';
+		type: 'offer' | 'answer' | 'ice-candidate' | 'join' | 'leave' | 'timer-start' | 'timer-pause' | 'timer-resume' | 'timer-reset';
 		from: string;
 		to?: string;
 		data: any;
@@ -243,6 +248,29 @@ export default function LiveSessionPage() {
 			case 'ice-candidate':
 				// Received ICE candidate
 				await handleIceCandidate(message.from, message.data);
+				break;
+			case 'timer-start':
+				// Host started timer - start countdown for all participants
+				if (message.data.withCountdown) {
+					setCountdown(3);
+					playTone("bell"); // Play sound for countdown start
+				} else {
+					setTimerState("running");
+					setTimeLeft(message.data.duration || duration * 60);
+				}
+				break;
+			case 'timer-pause':
+				// Host paused timer
+				setTimerState("paused");
+				break;
+			case 'timer-resume':
+				// Host resumed timer
+				setTimerState("running");
+				break;
+			case 'timer-reset':
+				// Host reset timer
+				setTimerState("idle");
+				setTimeLeft(message.data.duration || duration * 60);
 				break;
 		}
 	};
@@ -277,10 +305,16 @@ export default function LiveSessionPage() {
 				);
 			},
 			(event) => {
-				// Handle remote track
-				const videoElement = remoteVideoRefs.current.get(participantId);
-				if (videoElement && event.streams[0]) {
-					videoElement.srcObject = event.streams[0];
+				// Handle remote track - store stream and attach to video element
+				if (event.streams && event.streams[0]) {
+					const stream = event.streams[0];
+					remoteStreamsRef.current.set(participantId, stream);
+					
+					// Try to attach immediately if video element exists
+					const videoElement = remoteVideoRefs.current.get(participantId);
+					if (videoElement) {
+						videoElement.srcObject = stream;
+					}
 				}
 			},
 			(state) => {
@@ -303,13 +337,13 @@ export default function LiveSessionPage() {
 		try {
 			const offer = await pc.createOffer();
 			await pc.setLocalDescription(offer);
-			await sendSignalingMessage(
-				sessionId,
-				"offer",
-				userIdRef.current,
-				participantId,
-				offer
-			);
+							await sendSignalingMessage(
+					sessionId,
+					"offer",
+					userIdRef.current,
+					participantId,
+					offer
+				);
 		} catch (error) {
 			console.error("Error creating offer:", error);
 		}
@@ -324,12 +358,15 @@ export default function LiveSessionPage() {
 			peerConnectionsRef.current.delete(participantId);
 		}
 		
-		// Remove video element
+		// Remove video element and stream
 		const videoElement = remoteVideoRefs.current.get(participantId);
 		if (videoElement) {
 			videoElement.srcObject = null;
 			remoteVideoRefs.current.delete(participantId);
 		}
+		
+		// Remove stored stream
+		remoteStreamsRef.current.delete(participantId);
 		
 		// Remove from participants list
 		setParticipants((prev) => prev.filter((p) => p.id !== participantId));
@@ -352,9 +389,16 @@ export default function LiveSessionPage() {
 					);
 				},
 				(event) => {
-					const videoElement = remoteVideoRefs.current.get(from);
-					if (videoElement && event.streams[0]) {
-						videoElement.srcObject = event.streams[0];
+					// Handle remote track - store stream and attach to video element
+					if (event.streams && event.streams[0]) {
+						const stream = event.streams[0];
+						remoteStreamsRef.current.set(from, stream);
+						
+						// Try to attach immediately if video element exists
+						const videoElement = remoteVideoRefs.current.get(from);
+						if (videoElement) {
+							videoElement.srcObject = stream;
+						}
 					}
 				}
 			);
@@ -444,28 +488,58 @@ export default function LiveSessionPage() {
 		if (!isHost) return;
 		setTimerState("running");
 		setTimeLeft(duration * 60);
+		// Broadcast timer start to all participants
+		sendSignalingMessage(sessionId, "timer-start", userIdRef.current, undefined, {
+			duration: duration * 60,
+			withCountdown: false, // Already counted down
+		});
 	};
 
 	const handlePauseTimer = () => {
 		if (!isHost) return;
 		setTimerState("paused");
+		// Broadcast timer pause to all participants
+		sendSignalingMessage(sessionId, "timer-pause", userIdRef.current, undefined, {});
 	};
 
 	const handleResumeTimer = () => {
 		if (!isHost) return;
 		setTimerState("running");
+		// Broadcast timer resume to all participants
+		sendSignalingMessage(sessionId, "timer-resume", userIdRef.current, undefined, {});
 	};
 
 	const handleResetTimer = () => {
 		if (!isHost) return;
 		setTimerState("idle");
 		setTimeLeft(duration * 60);
+		// Broadcast timer reset to all participants
+		sendSignalingMessage(sessionId, "timer-reset", userIdRef.current, undefined, {
+			duration: duration * 60,
+		});
 	};
 
 	const handleStopTimer = () => {
 		if (!isHost) return;
 		setTimerState("idle");
 		setTimeLeft(duration * 60);
+		// Broadcast timer reset to all participants
+		sendSignalingMessage(sessionId, "timer-reset", userIdRef.current, undefined, {
+			duration: duration * 60,
+		});
+	};
+
+	// Start timer with countdown (host only)
+	const handleStartTimerWithCountdown = () => {
+		if (!isHost) return;
+		// Start countdown for host
+		setCountdown(3);
+		playTone("bell");
+		// Broadcast countdown start to all participants
+		sendSignalingMessage(sessionId, "timer-start", userIdRef.current, undefined, {
+			duration: duration * 60,
+			withCountdown: true,
+		});
 	};
 
 	// Timer logic
@@ -493,6 +567,52 @@ export default function LiveSessionPage() {
 			}
 		};
 	}, [timerState, timeLeft, selectedRingtone]);
+
+	// Countdown logic
+	useEffect(() => {
+		// Clear any existing interval
+		if (countdownIntervalRef.current) {
+			clearInterval(countdownIntervalRef.current);
+			countdownIntervalRef.current = null;
+		}
+
+		if (countdown !== null && countdown > 0) {
+			// Play sound for the current countdown number
+			if (countdown <= 3) {
+				playTone("bell");
+			}
+
+			// Start countdown interval
+			countdownIntervalRef.current = setInterval(() => {
+				setCountdown((prev) => {
+					if (prev === null || prev <= 1) {
+						return 0; // Set to 0 to trigger completion
+					}
+					return prev - 1;
+				});
+			}, 1000);
+		} else if (countdown === 0) {
+			// Countdown finished - start timer
+			setCountdown(null);
+			if (isHost) {
+				// Host starts the actual timer
+				setTimerState("running");
+				setTimeLeft(duration * 60);
+				// Broadcast actual timer start (without countdown)
+				sendSignalingMessage(sessionId, "timer-start", userIdRef.current, undefined, {
+					duration: duration * 60,
+					withCountdown: false,
+				});
+			}
+		}
+
+		return () => {
+			if (countdownIntervalRef.current) {
+				clearInterval(countdownIntervalRef.current);
+				countdownIntervalRef.current = null;
+			}
+		};
+	}, [countdown, isHost, duration, sessionId]);
 
 	// Copy session ID
 	const handleCopySessionId = () => {
@@ -524,10 +644,15 @@ export default function LiveSessionPage() {
 
 	const progress = duration > 0 ? (timeLeft / (duration * 60)) * 100 : 0;
 
-	// Set ref for remote video elements
+	// Set ref for remote video elements and attach stored streams
 	const setRemoteVideoRef = (participantId: string, element: HTMLVideoElement | null) => {
 		if (element) {
 			remoteVideoRefs.current.set(participantId, element);
+			// If we already have a stream for this participant, attach it
+			const stream = remoteStreamsRef.current.get(participantId);
+			if (stream) {
+				element.srcObject = stream;
+			}
 		} else {
 			remoteVideoRefs.current.delete(participantId);
 		}
@@ -669,22 +794,36 @@ export default function LiveSessionPage() {
 							</div>
 
 							<div className="text-center mb-6">
-								<div className="text-5xl font-bold text-white mb-2">
-									{formatTime(timeLeft)}
-								</div>
-								<div className="w-full bg-white/10 rounded-full h-2">
-									<div
-										className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-1000"
-										style={{ width: `${progress}%` }}
-									/>
-								</div>
+								{countdown !== null ? (
+									<motion.div
+										key={countdown}
+										initial={{ scale: 0.5, opacity: 0 }}
+										animate={{ scale: 1, opacity: 1 }}
+										exit={{ scale: 0.5, opacity: 0 }}
+										className="text-8xl font-bold text-white mb-2"
+									>
+										{countdown}
+									</motion.div>
+								) : (
+									<div className="text-5xl font-bold text-white mb-2">
+										{formatTime(timeLeft)}
+									</div>
+								)}
+								{countdown === null && (
+									<div className="w-full bg-white/10 rounded-full h-2">
+										<div
+											className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-1000"
+											style={{ width: `${progress}%` }}
+										/>
+									</div>
+								)}
 							</div>
 
 							{isHost && (
 								<div className="space-y-3">
 									{timerState === "idle" && (
 										<Button
-											onClick={handleStartTimer}
+											onClick={handleStartTimerWithCountdown}
 											variant="classic"
 											size="4"
 											className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold"
@@ -750,7 +889,7 @@ export default function LiveSessionPage() {
 								</div>
 							)}
 
-							{!isHost && (
+							{!isHost && timerState === "idle" && (
 								<p className="text-center text-white/70 text-sm">
 									Waiting for host to start...
 								</p>
