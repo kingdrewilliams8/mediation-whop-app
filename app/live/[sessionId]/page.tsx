@@ -270,7 +270,7 @@ export default function LiveSessionPage() {
 				"offer",
 				userIdRef.current,
 				participantId,
-				offer.toJSON()
+				offer
 			);
 		} catch (error) {
 			console.error("Error creating offer:", error);
@@ -342,7 +342,7 @@ export default function LiveSessionPage() {
 				"answer",
 				userIdRef.current,
 				from,
-				answer.toJSON()
+				answer
 			);
 		} catch (error) {
 			console.error("Error handling offer:", error);
