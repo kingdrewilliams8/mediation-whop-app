@@ -2,7 +2,7 @@
 
 import { Button } from "@whop/react/components";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageCircle, Share2, Heart, TrendingUp, Send, User, Clock } from "lucide-react";
+import { MessageCircle, Share2, Heart, TrendingUp, Send, User } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { format } from "date-fns";
 import { getAllSessions } from "@/lib/storage";
