@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@whop/react/components";
-import { Calendar, Home, Timer, Plus, Settings, Music } from "lucide-react";
+import { Calendar, Home, Timer, Plus, Settings, Music, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -12,6 +12,7 @@ export function Navigation() {
 		{ href: "/", label: "Home", icon: Home },
 		{ href: "/tracker", label: "Tracker", icon: Plus },
 		{ href: "/timer", label: "Timer", icon: Timer },
+		{ href: "/community", label: "Community", icon: Users },
 		{ href: "/soothing-sounds", label: "Sounds", icon: Music },
 		{ href: "/settings", label: "Settings", icon: Settings },
 	];
@@ -21,6 +22,7 @@ export function Navigation() {
 		"/calendar": "#60a5fa", // Blue
 		"/tracker": "#fb923c", // Orange
 		"/timer": "#a78bfa", // Purple
+		"/community": "#22c55e", // Green
 		"/soothing-sounds": "#60a5fa", // Blue
 		"/settings": "#f472b6", // Pink
 	};
