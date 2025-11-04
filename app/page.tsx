@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Moon, Sunrise, Cloud, Droplet, BookOpen, GraduationCap, Headphones, Lock } from "lucide-react";
+import { Moon, Sunrise, Cloud, Droplet, BookOpen, GraduationCap, Headphones, Lock, Video, Users } from "lucide-react";
 import { MeditationIcon, BreathworkIcon } from "@/components/CategoryIcons";
 import { useEffect, useState } from "react";
 import { getTodayGoal, saveTodayGoal } from "@/lib/goals";
@@ -203,6 +203,51 @@ export default function Dashboard() {
 						</motion.button>
 					);
 				})}
+			</motion.div>
+
+			{/* Live Sessions Section */}
+			<motion.div
+				initial={{ opacity: 0, y: 20 }}
+				animate={{ opacity: 1, y: 0 }}
+				transition={{ delay: 0.15 }}
+				className="mb-8"
+			>
+				<div className="flex items-center gap-3 mb-4 justify-center">
+					<Video className="w-6 h-6 text-gray-900 dark:text-white" />
+					<h2 className="text-2xl font-bold text-gray-900 dark:text-white">Live Sessions</h2>
+				</div>
+				<div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+					<Link href="/live/create">
+						<motion.div
+							whileHover={{ scale: 1.02, y: -2 }}
+							whileTap={{ scale: 0.98 }}
+							className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 border-2 border-purple-400/30 rounded-2xl p-6 cursor-pointer hover:border-purple-400/50 transition-all"
+						>
+							<div className="flex items-center gap-3 mb-2">
+								<div className="w-10 h-10 bg-purple-500/20 rounded-full flex items-center justify-center">
+									<Video className="w-5 h-5 text-purple-400" />
+								</div>
+								<h3 className="text-lg font-bold text-gray-900 dark:text-white">Host a Session</h3>
+							</div>
+							<p className="text-gray-700 dark:text-gray-300 text-sm">Create and lead a live meditation session for your community</p>
+						</motion.div>
+					</Link>
+					<Link href="/live/join">
+						<motion.div
+							whileHover={{ scale: 1.02, y: -2 }}
+							whileTap={{ scale: 0.98 }}
+							className="bg-gradient-to-br from-blue-600/20 to-purple-600/20 border-2 border-blue-400/30 rounded-2xl p-6 cursor-pointer hover:border-blue-400/50 transition-all"
+						>
+							<div className="flex items-center gap-3 mb-2">
+								<div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
+									<Users className="w-5 h-5 text-blue-400" />
+								</div>
+								<h3 className="text-lg font-bold text-gray-900 dark:text-white">Join a Session</h3>
+							</div>
+							<p className="text-gray-700 dark:text-gray-300 text-sm">Enter a session ID to join a live meditation with others</p>
+						</motion.div>
+					</Link>
+				</div>
 			</motion.div>
 
 			{/* Calendar Section */}

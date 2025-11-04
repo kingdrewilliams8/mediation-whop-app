@@ -95,6 +95,36 @@ body {
 	color: white !important;
 }
 
+/* Target elements on live session page with dark gradient background */
+:root:not(.dark) [class*="bg-gradient-to-br"][class*="from-purple-900"] .text-white,
+:root:not(.dark) [class*="bg-gradient-to-br"][class*="from-purple-900"] .text-white\/90,
+:root:not(.dark) [class*="bg-gradient-to-br"][class*="from-purple-900"] .text-white\/70,
+:root:not(.dark) [class*="bg-gradient-to-br"][class*="from-purple-900"] .text-white\/50,
+:root:not(.dark) [class*="bg-gradient-to-br"][class*="via-blue-900"] .text-white,
+:root:not(.dark) [class*="bg-gradient-to-br"][class*="via-blue-900"] .text-white\/90,
+:root:not(.dark) [class*="bg-gradient-to-br"][class*="via-blue-900"] .text-white\/70,
+:root:not(.dark) [class*="bg-gradient-to-br"][class*="via-blue-900"] .text-white\/50,
+:root:not(.dark) [class*="bg-gradient-to-br"][class*="to-indigo-900"] .text-white,
+:root:not(.dark) [class*="bg-gradient-to-br"][class*="to-indigo-900"] .text-white\/90,
+:root:not(.dark) [class*="bg-gradient-to-br"][class*="to-indigo-900"] .text-white\/70,
+:root:not(.dark) [class*="bg-gradient-to-br"][class*="to-indigo-900"] .text-white\/50 {
+	color: white !important;
+}
+
+/* Target all text inside live session page container */
+:root:not(.dark) [class*="bg-gradient-to-br"][class*="from-purple-900"][class*="via-blue-900"][class*="to-indigo-900"] * {
+	color: white !important;
+}
+
+:root:not(.dark) [class*="bg-gradient-to-br"][class*="from-purple-900"][class*="via-blue-900"][class*="to-indigo-900"] h1,
+:root:not(.dark) [class*="bg-gradient-to-br"][class*="from-purple-900"][class*="via-blue-900"][class*="to-indigo-900"] h2,
+:root:not(.dark) [class*="bg-gradient-to-br"][class*="from-purple-900"][class*="via-blue-900"][class*="to-indigo-900"] h3,
+:root:not(.dark) [class*="bg-gradient-to-br"][class*="from-purple-900"][class*="via-blue-900"][class*="to-indigo-900"] p,
+:root:not(.dark) [class*="bg-gradient-to-br"][class*="from-purple-900"][class*="via-blue-900"][class*="to-indigo-900"] span,
+:root:not(.dark) [class*="bg-gradient-to-br"][class*="from-purple-900"][class*="via-blue-900"][class*="to-indigo-900"] div {
+	color: white !important;
+}
+
 /* Set light mode background to white */
 :root:not(.dark) body,
 html:not(.dark) body {
