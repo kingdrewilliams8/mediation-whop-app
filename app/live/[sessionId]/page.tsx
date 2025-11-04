@@ -220,7 +220,7 @@ export default function LiveSessionPage() {
 
 	// Handle incoming signaling messages
 	const handleSignalingMessage = async (message: {
-		type: 'offer' | 'answer' | 'ice-candidate' | 'join' | 'leave' | 'timer-start' | 'timer-pause' | 'timer-resume' | 'timer-reset';
+		type: 'offer' | 'answer' | 'ice-candidate' | 'join' | 'leave' | 'timer-start' | 'timer-pause' | 'timer-resume' | 'timer-reset' | 'create-session';
 		from: string;
 		to?: string;
 		data: any;
@@ -271,6 +271,9 @@ export default function LiveSessionPage() {
 				// Host reset timer
 				setTimerState("idle");
 				setTimeLeft(message.data.duration || duration * 60);
+				break;
+			case 'create-session':
+				// Session creation message - no action needed (already handled by API)
 				break;
 		}
 	};
