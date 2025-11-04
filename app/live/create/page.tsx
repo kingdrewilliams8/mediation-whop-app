@@ -36,8 +36,25 @@ export default function CreateLiveSessionPage() {
 		localStorage.setItem(`live_session_${sessionId}`, JSON.stringify(sessionData));
 		localStorage.setItem("current_host_session", sessionId);
 		
-		// Store session data in API for cross-device access
-		// This will be handled when the host joins in the live session page
+		// Store session data in API immediately for cross-device access
+		try {
+			await fetch("/api/signaling", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					sessionId,
+					type: "create-session",
+					from: "host",
+					to: undefined,
+					data: {
+						sessionData: sessionData,
+					},
+				}),
+			});
+		} catch (error) {
+			console.error("Failed to store session in API:", error);
+			// Continue anyway - session will be stored when host joins
+		}
 		
 		// Navigate to the live session room
 		router.push(`/live/${sessionId}`);

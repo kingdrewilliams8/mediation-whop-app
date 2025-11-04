@@ -41,7 +41,7 @@ export function createPeerConnection(
 // Send signaling message to API
 export async function sendSignalingMessage(
 	sessionId: string,
-	type: 'offer' | 'answer' | 'ice-candidate' | 'join' | 'leave' | 'timer-start' | 'timer-pause' | 'timer-resume' | 'timer-reset',
+	type: 'offer' | 'answer' | 'ice-candidate' | 'join' | 'leave' | 'timer-start' | 'timer-pause' | 'timer-resume' | 'timer-reset' | 'create-session',
 	from: string,
 	to: string | undefined,
 	data: any
@@ -69,7 +69,7 @@ export async function pollSignalingMessages(
 	userId: string,
 	lastTimestamp: number,
 	onMessage: (message: {
-		type: 'offer' | 'answer' | 'ice-candidate' | 'join' | 'leave' | 'timer-start' | 'timer-pause' | 'timer-resume' | 'timer-reset';
+		type: 'offer' | 'answer' | 'ice-candidate' | 'join' | 'leave' | 'timer-start' | 'timer-pause' | 'timer-resume' | 'timer-reset' | 'create-session';
 		from: string;
 		to?: string;
 		data: any;

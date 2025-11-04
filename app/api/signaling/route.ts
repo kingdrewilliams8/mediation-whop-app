@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 // In-memory storage for signaling messages (in production, use Redis or a database)
 const signalingStore: Map<string, Array<{
-	type: 'offer' | 'answer' | 'ice-candidate' | 'join' | 'leave';
+	type: 'offer' | 'answer' | 'ice-candidate' | 'join' | 'leave' | 'timer-start' | 'timer-pause' | 'timer-resume' | 'timer-reset';
 	from: string;
 	to?: string;
 	data: any;
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		// Handle session creation/update (sessionData is inside data object when host joins)
+		// Handle session creation/update (sessionData is inside data object when host joins or creates session)
 		if (type === 'join' && data?.isHost && data?.sessionData) {
 			sessionStore.set(sessionId, {
 				id: data.sessionData.id || sessionId,
@@ -60,6 +60,19 @@ export async function POST(request: NextRequest) {
 				participants: [from],
 			});
 		}
+		
+		// Handle direct session creation (for immediate availability)
+		if (type === 'create-session' && data?.sessionData) {
+			sessionStore.set(sessionId, {
+				id: data.sessionData.id || sessionId,
+				name: data.sessionData.name,
+				description: data.sessionData.description || "",
+				duration: data.sessionData.duration || 10,
+				hostId: data.sessionData.hostId || from,
+				createdAt: data.sessionData.createdAt || new Date().toISOString(),
+				participants: [],
+			});
+		}
 
 		// Initialize session if it doesn't exist
 		if (!signalingStore.has(sessionId)) {
@@ -67,7 +80,7 @@ export async function POST(request: NextRequest) {
 		}
 
 		const message = {
-			type: type as 'offer' | 'answer' | 'ice-candidate' | 'join' | 'leave',
+			type: type as 'offer' | 'answer' | 'ice-candidate' | 'join' | 'leave' | 'timer-start' | 'timer-pause' | 'timer-resume' | 'timer-reset' | 'create-session',
 			from,
 			to: to || undefined,
 			data,
