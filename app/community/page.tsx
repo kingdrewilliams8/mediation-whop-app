@@ -2,7 +2,7 @@
 
 import { Button } from "@whop/react/components";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageCircle, Share2, Heart, TrendingUp, Send, User, Trash2, Settings, X, Check } from "lucide-react";
+import { MessageCircle, Share2, Heart, Send, User, Trash2, Settings, X, Check, Upload, TrendingUp } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
 interface Post {
@@ -25,32 +25,21 @@ interface ChatMessage {
 	timestamp: number;
 }
 
-const AVATAR_COLORS = [
-	"from-red-400 to-pink-400",
-	"from-orange-400 to-red-400",
-	"from-yellow-400 to-orange-400",
-	"from-green-400 to-teal-400",
-	"from-blue-400 to-cyan-400",
-	"from-indigo-400 to-blue-400",
-	"from-purple-400 to-indigo-400",
-	"from-pink-400 to-purple-400",
-];
-
 export default function CommunityPage() {
 	const [activeTab, setActiveTab] = useState<"feed" | "chat">("feed");
 	const [posts, setPosts] = useState<Post[]>([]);
 	const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 	const [newPostContent, setNewPostContent] = useState("");
-	const [newPostType, setNewPostType] = useState<"progress" | "tip">("progress");
 	const [newMessage, setNewMessage] = useState("");
 	const [userName, setUserName] = useState("User");
-	const [userAvatar, setUserAvatar] = useState(0);
+	const [userAvatar, setUserAvatar] = useState<string | null>(null);
 	const [showProfileSettings, setShowProfileSettings] = useState(false);
 	const [tempUserName, setTempUserName] = useState("");
-	const [tempUserAvatar, setTempUserAvatar] = useState(0);
+	const [tempUserAvatar, setTempUserAvatar] = useState<string | null>(null);
 	const [userId, setUserId] = useState("");
 	const chatEndRef = useRef<HTMLDivElement>(null);
 	const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+	const fileInputRef = useRef<HTMLInputElement>(null);
 
 	// Initialize user ID and load profile
 	useEffect(() => {
@@ -69,8 +58,8 @@ export default function CommunityPage() {
 
 		const storedAvatar = localStorage.getItem("community_avatar");
 		if (storedAvatar) {
-			setUserAvatar(parseInt(storedAvatar));
-			setTempUserAvatar(parseInt(storedAvatar));
+			setUserAvatar(storedAvatar);
+			setTempUserAvatar(storedAvatar);
 		}
 	}, []);
 
@@ -127,12 +116,35 @@ export default function CommunityPage() {
 		}
 	}, [chatMessages, activeTab]);
 
+	const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const file = e.target.files?.[0];
+		if (file && file.type.startsWith("image/")) {
+			const reader = new FileReader();
+			reader.onloadend = () => {
+				const imageUrl = reader.result as string;
+				setTempUserAvatar(imageUrl);
+			};
+			reader.readAsDataURL(file);
+		}
+	};
+
+	const handleRemoveAvatar = () => {
+		setTempUserAvatar(null);
+		if (fileInputRef.current) {
+			fileInputRef.current.value = "";
+		}
+	};
+
 	const handleSaveProfile = () => {
 		if (tempUserName.trim()) {
 			setUserName(tempUserName.trim());
 			setUserAvatar(tempUserAvatar);
 			localStorage.setItem("community_username", tempUserName.trim());
-			localStorage.setItem("community_avatar", tempUserAvatar.toString());
+			if (tempUserAvatar) {
+				localStorage.setItem("community_avatar", tempUserAvatar);
+			} else {
+				localStorage.removeItem("community_avatar");
+			}
 			setShowProfileSettings(false);
 		}
 	};
@@ -144,8 +156,8 @@ export default function CommunityPage() {
 		const newPost: Post = {
 			id: postId,
 			author: userName,
-			authorAvatar: userAvatar,
-			type: newPostType,
+			authorAvatar: userAvatar || undefined,
+			type: "progress",
 			content: newPostContent.trim(),
 			timestamp: Date.now(),
 			likes: 0,
@@ -216,7 +228,7 @@ export default function CommunityPage() {
 		const newChatMessage: ChatMessage = {
 			id: messageId,
 			author: userName,
-			authorAvatar: userAvatar,
+			authorAvatar: userAvatar || undefined,
 			message: newMessage.trim(),
 			timestamp: Date.now(),
 		};
@@ -248,8 +260,21 @@ export default function CommunityPage() {
 		return `${days}d ago`;
 	};
 
-	const getAvatarGradient = (avatarIndex: number) => {
-		return AVATAR_COLORS[avatarIndex % AVATAR_COLORS.length];
+	const getAvatarDisplay = (avatar: string | null | undefined) => {
+		if (avatar) {
+			return (
+				<img
+					src={avatar}
+					alt="Profile"
+					className="w-full h-full rounded-full object-cover"
+				/>
+			);
+		}
+		return (
+			<div className="w-full h-full rounded-full bg-gradient-to-br from-green-400 to-blue-400 flex items-center justify-center">
+				<User className="w-full h-full text-white p-2" />
+			</div>
+		);
 	};
 
 	return (
@@ -258,6 +283,25 @@ export default function CommunityPage() {
 			<div className="absolute top-0 left-0 w-96 h-96 bg-green-500/20 rounded-full blur-3xl -z-10" />
 			<div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl -z-10" />
 
+			{/* Profile Button - Top Left */}
+			<button
+				onClick={() => setShowProfileSettings(true)}
+				className="fixed top-4 left-4 z-40 flex items-center gap-3 bg-gradient-to-br from-green-600/20 to-blue-600/20 border-2 border-green-400/30 rounded-full px-4 py-3 backdrop-blur-sm hover:border-green-400/50 transition-all shadow-lg"
+			>
+				<div className="w-12 h-12 rounded-full overflow-hidden border-2 border-green-400/50 flex-shrink-0">
+					{getAvatarDisplay(userAvatar)}
+				</div>
+				<div className="text-left hidden sm:block">
+					<div className="text-sm font-semibold text-gray-900 dark:text-white">
+						{userName || "Set Profile"}
+					</div>
+					<div className="text-xs text-gray-600 dark:text-gray-400">
+						Tap to edit
+					</div>
+				</div>
+				<Settings className="w-5 h-5 text-green-400 flex-shrink-0" />
+			</button>
+
 			<motion.div
 				initial={{ opacity: 0, y: 20 }}
 				animate={{ opacity: 1, y: 0 }}
@@ -265,19 +309,9 @@ export default function CommunityPage() {
 			>
 				{/* Header */}
 				<div className="text-center mb-8">
-					<div className="flex items-center justify-center gap-3 mb-2">
-						<h1 className="text-4xl font-bold bg-gradient-to-r from-green-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
-							Community
-						</h1>
-						<Button
-							variant="ghost"
-							size="2"
-							onClick={() => setShowProfileSettings(true)}
-							className="rounded-full"
-						>
-							<Settings className="w-5 h-5" />
-						</Button>
-					</div>
+					<h1 className="text-4xl font-bold bg-gradient-to-r from-green-400 via-blue-400 to-purple-400 bg-clip-text text-transparent mb-2">
+						Community
+					</h1>
 					<p className="text-gray-700 dark:text-gray-300">
 						Connect, share, and grow together on your meditation journey
 					</p>
@@ -331,22 +365,47 @@ export default function CommunityPage() {
 										<label className="block text-sm font-semibold mb-2 text-gray-900 dark:text-gray-100">
 											Profile Picture
 										</label>
-										<div className="grid grid-cols-4 gap-3">
-											{AVATAR_COLORS.map((gradient, index) => (
-												<button
-													key={index}
-													onClick={() => setTempUserAvatar(index)}
-													className={`w-16 h-16 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center transition-all ${
-														tempUserAvatar === index
-															? "ring-4 ring-green-400 scale-110"
-															: "opacity-60 hover:opacity-80"
-													}`}
+										<div className="space-y-3">
+											{tempUserAvatar ? (
+												<div className="relative">
+													<div className="w-32 h-32 mx-auto rounded-full overflow-hidden border-4 border-green-400/50">
+														<img
+															src={tempUserAvatar}
+															alt="Profile"
+															className="w-full h-full object-cover"
+														/>
+													</div>
+													<button
+														onClick={handleRemoveAvatar}
+														className="absolute top-0 right-1/2 transform translate-x-16 p-2 bg-red-500 rounded-full hover:bg-red-600 transition-colors"
+													>
+														<X className="w-4 h-4 text-white" />
+													</button>
+												</div>
+											) : (
+												<div className="w-32 h-32 mx-auto rounded-full bg-gradient-to-br from-green-400 to-blue-400 flex items-center justify-center border-4 border-green-400/50">
+													<User className="w-16 h-16 text-white" />
+												</div>
+											)}
+											<label className="block">
+												<input
+													ref={fileInputRef}
+													type="file"
+													accept="image/*"
+													onChange={handleFileUpload}
+													className="hidden"
+													id="avatar-upload"
+												/>
+												<div
+													onClick={() => fileInputRef.current?.click()}
+													className="flex items-center justify-center gap-3 p-3 rounded-lg border-2 border-dashed border-green-400/50 hover:border-green-400 cursor-pointer transition-colors"
 												>
-													{tempUserAvatar === index && (
-														<Check className="w-6 h-6 text-white" />
-													)}
-												</button>
-											))}
+													<Upload className="w-5 h-5 text-green-400" />
+													<span className="text-gray-900 dark:text-white text-sm">
+														{tempUserAvatar ? "Change Picture" : "Upload Picture"}
+													</span>
+												</div>
+											</label>
 										</div>
 									</div>
 
@@ -400,35 +459,11 @@ export default function CommunityPage() {
 						>
 							{/* Create Post */}
 							<div className="bg-gradient-to-br from-green-600/20 to-blue-600/20 border-2 border-green-400/30 rounded-2xl p-6">
-								<div className="flex gap-2 mb-4">
-									<Button
-										variant={newPostType === "progress" ? "classic" : "ghost"}
-										size="2"
-										onClick={() => setNewPostType("progress")}
-										className={newPostType === "progress" ? "bg-green-500" : ""}
-									>
-										<TrendingUp className="w-4 h-4 mr-1" />
-										Progress
-									</Button>
-									<Button
-										variant={newPostType === "tip" ? "classic" : "ghost"}
-										size="2"
-										onClick={() => setNewPostType("tip")}
-										className={newPostType === "tip" ? "bg-blue-500" : ""}
-									>
-										<Share2 className="w-4 h-4 mr-1" />
-										Tip
-									</Button>
-								</div>
 								<textarea
 									value={newPostContent}
 									onChange={(e) => setNewPostContent(e.target.value)}
-									placeholder={
-										newPostType === "progress"
-											? "Share your meditation progress or achievement..."
-											: "Share a meditation tip or insight..."
-									}
-									rows={3}
+									placeholder="Share your meditation progress, tips, or achievements..."
+									rows={4}
 									className="w-full px-4 py-3 rounded-xl border-2 border-green-400/30 bg-white/5 backdrop-blur-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:border-green-400 focus:ring-2 focus:ring-green-400/50 resize-none mb-4"
 								/>
 								<Button
@@ -456,12 +491,8 @@ export default function CommunityPage() {
 											className="bg-gradient-to-br from-white/10 to-white/5 border border-white/20 rounded-2xl p-6 backdrop-blur-sm"
 										>
 											<div className="flex items-start gap-4 mb-3">
-												<div
-													className={`w-10 h-10 rounded-full bg-gradient-to-br ${getAvatarGradient(
-														post.authorAvatar ?? 0
-													)} flex items-center justify-center flex-shrink-0`}
-												>
-													<User className="w-5 h-5 text-white" />
+												<div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border-2 border-green-400/30">
+													{getAvatarDisplay(post.authorAvatar)}
 												</div>
 												<div className="flex-1">
 													<div className="flex items-center gap-2 mb-1">
@@ -568,12 +599,8 @@ export default function CommunityPage() {
 												key={msg.id}
 												className={`flex gap-3 ${isOwnMessage ? "flex-row-reverse" : ""}`}
 											>
-												<div
-													className={`w-8 h-8 rounded-full bg-gradient-to-br ${getAvatarGradient(
-														msg.authorAvatar ?? 0
-													)} flex items-center justify-center flex-shrink-0`}
-												>
-													<User className="w-4 h-4 text-white" />
+												<div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 border-2 border-blue-400/30">
+													{getAvatarDisplay(msg.authorAvatar)}
 												</div>
 												<div
 													className={`max-w-[70%] ${
