@@ -3,7 +3,7 @@
 import { Button } from "@whop/react/components";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, Share2, Heart, Send, User, Trash2, Settings, X, Check, Upload, TrendingUp } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, memo } from "react";
 
 interface Post {
 	id: string;
@@ -25,6 +25,45 @@ interface ChatMessage {
 	timestamp: number;
 }
 
+// Memoized Chat Message Component to prevent unnecessary re-renders
+const ChatMessageItem = memo(({ msg, userName, getAvatarDisplay, formatTimeAgo }: {
+	msg: ChatMessage;
+	userName: string;
+	getAvatarDisplay: (avatar: string | null | undefined) => React.ReactNode;
+	formatTimeAgo: (timestamp: number) => string;
+}) => {
+	const isOwnMessage = msg.author === userName;
+	return (
+		<div className={`flex gap-3 ${isOwnMessage ? "flex-row-reverse" : ""}`}>
+			<div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 border-2 border-blue-400/30">
+				{getAvatarDisplay(msg.authorAvatar)}
+			</div>
+			<div
+				className={`max-w-[70%] ${
+					isOwnMessage ? "items-end" : "items-start"
+				} flex flex-col`}
+			>
+				<span className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+					{msg.author}
+				</span>
+				<div
+					className={`rounded-2xl px-4 py-2 ${
+						isOwnMessage
+							? "bg-blue-500 text-white"
+							: "bg-white/10 text-gray-900 dark:text-gray-100"
+					}`}
+				>
+					<p className="text-sm whitespace-pre-wrap">{msg.message}</p>
+				</div>
+				<span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+					{formatTimeAgo(msg.timestamp)}
+				</span>
+			</div>
+		</div>
+	);
+});
+ChatMessageItem.displayName = "ChatMessageItem";
+
 export default function CommunityPage() {
 	const [activeTab, setActiveTab] = useState<"feed" | "chat">("feed");
 	const [posts, setPosts] = useState<Post[]>([]);
@@ -44,6 +83,7 @@ export default function CommunityPage() {
 	const isFetchingMessagesRef = useRef(false);
 	const lastMessagesLengthRef = useRef(0);
 	const shouldScrollToBottomRef = useRef(false);
+	const lastMessageIdsRef = useRef<string>(""); // Track last message IDs to prevent unnecessary updates
 
 	// Initialize user ID and load profile
 	useEffect(() => {
@@ -91,38 +131,35 @@ export default function CommunityPage() {
 				const data = await response.json();
 				const newMessages = data.messages || [];
 				
-				// Check if a new message was added (scroll to bottom)
-				const isNewMessage = newMessages.length > lastMessagesLengthRef.current;
-				shouldScrollToBottomRef.current = isNewMessage;
+				// Check if messages actually changed by comparing IDs
+				const newIds = newMessages.map((m: ChatMessage) => m.id).join(",");
 				
-				// Only update if messages actually changed (using functional update to access latest state)
-				setChatMessages((currentMessages) => {
-					const currentIds = currentMessages.map(m => m.id).join(",");
-					const newIds = newMessages.map((m: ChatMessage) => m.id).join(",");
+				// Only update if IDs changed (prevent unnecessary state updates)
+				if (newIds !== lastMessageIdsRef.current) {
+					// Check if a new message was added (scroll to bottom)
+					const isNewMessage = newMessages.length > lastMessagesLengthRef.current;
+					shouldScrollToBottomRef.current = isNewMessage;
 					
-					if (currentIds !== newIds) {
-						// Store scroll position before update (if not at bottom)
-						const container = messagesContainerRef.current;
-						const isNearBottom = container 
-							? container.scrollHeight - container.scrollTop - container.clientHeight < 100
-							: true;
-						
-						lastMessagesLengthRef.current = newMessages.length;
-						
-						// Only auto-scroll if user was near bottom or new message added
-						if (isNearBottom || isNewMessage) {
-							setTimeout(() => {
-								if (chatEndRef.current) {
-									chatEndRef.current.scrollIntoView({ behavior: "smooth" });
-								}
-							}, 50);
-						}
-						
-						return newMessages;
+					// Store scroll position before update (if not at bottom)
+					const container = messagesContainerRef.current;
+					const isNearBottom = container 
+						? container.scrollHeight - container.scrollTop - container.clientHeight < 100
+						: true;
+					
+					// Update refs and state only if messages changed
+					lastMessageIdsRef.current = newIds;
+					lastMessagesLengthRef.current = newMessages.length;
+					setChatMessages(newMessages);
+					
+					// Only auto-scroll if user was near bottom or new message added
+					if (isNearBottom || isNewMessage) {
+						setTimeout(() => {
+							if (chatEndRef.current) {
+								chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+							}
+						}, 50);
 					}
-					
-					return currentMessages; // No change, return current state
-				});
+				}
 			}
 		} catch (error) {
 			console.error("Error fetching messages:", error);
@@ -153,17 +190,7 @@ export default function CommunityPage() {
 		};
 	}, [activeTab]); // Re-create interval when tab changes
 
-	// Auto-scroll chat to bottom when new message is added
-	useEffect(() => {
-		if (activeTab === "chat" && chatEndRef.current && shouldScrollToBottomRef.current) {
-			setTimeout(() => {
-				if (chatEndRef.current) {
-					chatEndRef.current.scrollIntoView({ behavior: "smooth" });
-				}
-				shouldScrollToBottomRef.current = false;
-			}, 100);
-		}
-	}, [chatMessages.length, activeTab]); // Only trigger on length change, not full array update
+	// Note: Auto-scrolling is now handled directly in fetchMessages to prevent flickering
 
 	// ... existing code ...
 
@@ -644,40 +671,15 @@ export default function CommunityPage() {
 									<p>No messages yet. Start the conversation!</p>
 								</div>
 							) : (
-								chatMessages.map((msg) => {
-									const isOwnMessage = msg.author === userName;
-									return (
-										<div
-											key={msg.id}
-											className={`flex gap-3 ${isOwnMessage ? "flex-row-reverse" : ""}`}
-										>
-											<div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 border-2 border-blue-400/30">
-												{getAvatarDisplay(msg.authorAvatar)}
-											</div>
-											<div
-												className={`max-w-[70%] ${
-													isOwnMessage ? "items-end" : "items-start"
-												} flex flex-col`}
-											>
-												<span className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-													{msg.author}
-												</span>
-												<div
-													className={`rounded-2xl px-4 py-2 ${
-														isOwnMessage
-															? "bg-blue-500 text-white"
-															: "bg-white/10 text-gray-900 dark:text-gray-100"
-													}`}
-												>
-													<p className="text-sm whitespace-pre-wrap">{msg.message}</p>
-												</div>
-												<span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-													{formatTimeAgo(msg.timestamp)}
-												</span>
-											</div>
-										</div>
-									);
-								})
+								chatMessages.map((msg) => (
+									<ChatMessageItem
+										key={msg.id}
+										msg={msg}
+										userName={userName}
+										getAvatarDisplay={getAvatarDisplay}
+										formatTimeAgo={formatTimeAgo}
+									/>
+								))
 							)}
 							<div ref={chatEndRef} />
 						</div>
