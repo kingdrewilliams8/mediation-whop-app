@@ -40,6 +40,10 @@ export default function CommunityPage() {
 	const chatEndRef = useRef<HTMLDivElement>(null);
 	const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 	const fileInputRef = useRef<HTMLInputElement>(null);
+	const messagesContainerRef = useRef<HTMLDivElement>(null);
+	const isFetchingMessagesRef = useRef(false);
+	const lastMessagesLengthRef = useRef(0);
+	const shouldScrollToBottomRef = useRef(false);
 
 	// Initialize user ID and load profile
 	useEffect(() => {
@@ -76,16 +80,54 @@ export default function CommunityPage() {
 		}
 	};
 
-	// Load chat messages from API
+	// Load chat messages from API with smart updates
 	const fetchMessages = async () => {
+		if (isFetchingMessagesRef.current) return; // Prevent concurrent fetches
+		
+		isFetchingMessagesRef.current = true;
 		try {
 			const response = await fetch("/api/community/chat");
 			if (response.ok) {
 				const data = await response.json();
-				setChatMessages(data.messages || []);
+				const newMessages = data.messages || [];
+				
+				// Check if a new message was added (scroll to bottom)
+				const isNewMessage = newMessages.length > lastMessagesLengthRef.current;
+				shouldScrollToBottomRef.current = isNewMessage;
+				
+				// Only update if messages actually changed (using functional update to access latest state)
+				setChatMessages((currentMessages) => {
+					const currentIds = currentMessages.map(m => m.id).join(",");
+					const newIds = newMessages.map((m: ChatMessage) => m.id).join(",");
+					
+					if (currentIds !== newIds) {
+						// Store scroll position before update (if not at bottom)
+						const container = messagesContainerRef.current;
+						const isNearBottom = container 
+							? container.scrollHeight - container.scrollTop - container.clientHeight < 100
+							: true;
+						
+						lastMessagesLengthRef.current = newMessages.length;
+						
+						// Only auto-scroll if user was near bottom or new message added
+						if (isNearBottom || isNewMessage) {
+							setTimeout(() => {
+								if (chatEndRef.current) {
+									chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+								}
+							}, 50);
+						}
+						
+						return newMessages;
+					}
+					
+					return currentMessages; // No change, return current state
+				});
 			}
 		} catch (error) {
 			console.error("Error fetching messages:", error);
+		} finally {
+			isFetchingMessagesRef.current = false;
 		}
 	};
 
@@ -95,11 +137,13 @@ export default function CommunityPage() {
 		fetchMessages();
 	}, []);
 
-	// Poll for new posts and messages
+	// Poll for new posts and messages (only when activeTab is visible)
 	useEffect(() => {
 		pollingIntervalRef.current = setInterval(() => {
 			fetchPosts();
-			fetchMessages();
+			if (activeTab === "chat") {
+				fetchMessages();
+			}
 		}, 2000); // Poll every 2 seconds
 
 		return () => {
@@ -107,14 +151,21 @@ export default function CommunityPage() {
 				clearInterval(pollingIntervalRef.current);
 			}
 		};
-	}, []);
+	}, [activeTab]); // Re-create interval when tab changes
 
-	// Auto-scroll chat to bottom
+	// Auto-scroll chat to bottom when new message is added
 	useEffect(() => {
-		if (activeTab === "chat" && chatEndRef.current) {
-			chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+		if (activeTab === "chat" && chatEndRef.current && shouldScrollToBottomRef.current) {
+			setTimeout(() => {
+				if (chatEndRef.current) {
+					chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+				}
+				shouldScrollToBottomRef.current = false;
+			}, 100);
 		}
-	}, [chatMessages, activeTab]);
+	}, [chatMessages.length, activeTab]); // Only trigger on length change, not full array update
+
+	// ... existing code ...
 
 	const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const file = e.target.files?.[0];
@@ -242,7 +293,9 @@ export default function CommunityPage() {
 
 			if (response.ok) {
 				setNewMessage("");
-				fetchMessages(); // Refresh messages
+				shouldScrollToBottomRef.current = true;
+				// Immediately fetch to show new message
+				setTimeout(() => fetchMessages(), 100);
 			}
 		} catch (error) {
 			console.error("Error sending message:", error);
@@ -448,218 +501,216 @@ export default function CommunityPage() {
 				</div>
 
 				{/* Feed Tab */}
-				<AnimatePresence mode="wait">
-					{activeTab === "feed" && (
-						<motion.div
-							key="feed"
-							initial={{ opacity: 0, x: -20 }}
-							animate={{ opacity: 1, x: 0 }}
-							exit={{ opacity: 0, x: 20 }}
-							className="space-y-6"
-						>
-							{/* Create Post */}
-							<div className="bg-gradient-to-br from-green-600/20 to-blue-600/20 border-2 border-green-400/30 rounded-2xl p-6">
-								<textarea
-									value={newPostContent}
-									onChange={(e) => setNewPostContent(e.target.value)}
-									placeholder="Share your meditation progress, tips, or achievements..."
-									rows={4}
-									className="w-full px-4 py-3 rounded-xl border-2 border-green-400/30 bg-white/5 backdrop-blur-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:border-green-400 focus:ring-2 focus:ring-green-400/50 resize-none mb-4"
-								/>
-								<Button
-									onClick={handleShareProgress}
-									variant="classic"
-									size="3"
-									className="w-full bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white"
-									disabled={!newPostContent.trim()}
-								>
-									<Share2 className="w-4 h-4 mr-2" />
-									Share
-								</Button>
-							</div>
+				{activeTab === "feed" && (
+					<motion.div
+						key="feed"
+						initial={{ opacity: 0, x: -20 }}
+						animate={{ opacity: 1, x: 0 }}
+						exit={{ opacity: 0, x: 20 }}
+						className="space-y-6"
+					>
+						{/* Create Post */}
+						<div className="bg-gradient-to-br from-green-600/20 to-blue-600/20 border-2 border-green-400/30 rounded-2xl p-6">
+							<textarea
+								value={newPostContent}
+								onChange={(e) => setNewPostContent(e.target.value)}
+								placeholder="Share your meditation progress, tips, or achievements..."
+								rows={4}
+								className="w-full px-4 py-3 rounded-xl border-2 border-green-400/30 bg-white/5 backdrop-blur-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:border-green-400 focus:ring-2 focus:ring-green-400/50 resize-none mb-4"
+							/>
+							<Button
+								onClick={handleShareProgress}
+								variant="classic"
+								size="3"
+								className="w-full bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white"
+								disabled={!newPostContent.trim()}
+							>
+								<Share2 className="w-4 h-4 mr-2" />
+								Share
+							</Button>
+						</div>
 
-							{/* Posts Feed */}
-							<div className="space-y-4">
-								{posts.map((post) => {
-									const hasLiked = post.likedBy.includes(userId);
-									const isOwnPost = post.author === userName;
-									return (
-										<motion.div
-											key={post.id}
-											initial={{ opacity: 0, y: 20 }}
-											animate={{ opacity: 1, y: 0 }}
-											className="bg-gradient-to-br from-white/10 to-white/5 border border-white/20 rounded-2xl p-6 backdrop-blur-sm"
-										>
-											<div className="flex items-start gap-4 mb-3">
-												<div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border-2 border-green-400/30">
-													{getAvatarDisplay(post.authorAvatar)}
-												</div>
-												<div className="flex-1">
-													<div className="flex items-center gap-2 mb-1">
-														<span className="font-semibold text-gray-900 dark:text-white">
-															{post.author}
-														</span>
-														<span className="px-2 py-0.5 text-xs rounded-full bg-green-500/20 text-green-400 border border-green-500/30">
-															{post.type === "progress" ? (
-																<>
-																	<TrendingUp className="w-3 h-3 inline mr-1" />
-																	Progress
-																</>
-															) : (
-																<>
-																	<Share2 className="w-3 h-3 inline mr-1" />
-																	Tip
-																</>
-															)}
-														</span>
-														<span className="text-xs text-gray-500 dark:text-gray-400">
-															{formatTimeAgo(post.timestamp)}
-														</span>
-														{isOwnPost && (
-															<button
-																onClick={() => handleDeletePost(post.id, post.author)}
-																className="ml-auto text-red-400 hover:text-red-300 transition-colors"
-															>
-																<Trash2 className="w-4 h-4" />
-															</button>
+						{/* Posts Feed */}
+						<div className="space-y-4">
+							{posts.map((post) => {
+								const hasLiked = post.likedBy.includes(userId);
+								const isOwnPost = post.author === userName;
+								return (
+									<motion.div
+										key={post.id}
+										initial={{ opacity: 0, y: 20 }}
+										animate={{ opacity: 1, y: 0 }}
+										className="bg-gradient-to-br from-white/10 to-white/5 border border-white/20 rounded-2xl p-6 backdrop-blur-sm"
+									>
+										<div className="flex items-start gap-4 mb-3">
+											<div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border-2 border-green-400/30">
+												{getAvatarDisplay(post.authorAvatar)}
+											</div>
+											<div className="flex-1">
+												<div className="flex items-center gap-2 mb-1">
+													<span className="font-semibold text-gray-900 dark:text-white">
+														{post.author}
+													</span>
+													<span className="px-2 py-0.5 text-xs rounded-full bg-green-500/20 text-green-400 border border-green-500/30">
+														{post.type === "progress" ? (
+															<>
+																<TrendingUp className="w-3 h-3 inline mr-1" />
+																Progress
+															</>
+														) : (
+															<>
+																<Share2 className="w-3 h-3 inline mr-1" />
+																Tip
+															</>
 														)}
-													</div>
-													<p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
-														{post.content}
-													</p>
+													</span>
+													<span className="text-xs text-gray-500 dark:text-gray-400">
+														{formatTimeAgo(post.timestamp)}
+													</span>
+													{isOwnPost && (
+														<button
+															onClick={() => handleDeletePost(post.id, post.author)}
+															className="ml-auto text-red-400 hover:text-red-300 transition-colors"
+														>
+															<Trash2 className="w-4 h-4" />
+														</button>
+													)}
 												</div>
+												<p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+													{post.content}
+												</p>
 											</div>
-											<div className="flex items-center gap-4 pt-3 border-t border-white/10">
-												<button
-													onClick={() => handleLike(post)}
-													className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all ${
-														hasLiked
-															? "bg-red-500/20 text-red-400"
-															: "bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-white/10"
-													}`}
-												>
-													<Heart
-														className={`w-4 h-4 ${hasLiked ? "fill-current" : ""}`}
-													/>
-													<span className="text-sm">{post.likes}</span>
-												</button>
-												<div className="flex items-center gap-2 text-gray-600 dark:text-gray-400 text-sm">
-													<MessageCircle className="w-4 h-4" />
-													<span>{post.comments.length}</span>
-												</div>
+										</div>
+										<div className="flex items-center gap-4 pt-3 border-t border-white/10">
+											<button
+												onClick={() => handleLike(post)}
+												className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all ${
+													hasLiked
+														? "bg-red-500/20 text-red-400"
+														: "bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-white/10"
+												}`}
+											>
+												<Heart
+													className={`w-4 h-4 ${hasLiked ? "fill-current" : ""}`}
+												/>
+												<span className="text-sm">{post.likes}</span>
+											</button>
+											<div className="flex items-center gap-2 text-gray-600 dark:text-gray-400 text-sm">
+												<MessageCircle className="w-4 h-4" />
+												<span>{post.comments.length}</span>
 											</div>
-										</motion.div>
-									);
-								})}
+										</div>
+									</motion.div>
+								);
+							})}
 
-								{posts.length === 0 && (
-									<div className="text-center py-12 text-gray-500 dark:text-gray-400">
-										<Share2 className="w-12 h-12 mx-auto mb-4 opacity-50" />
-										<p>No posts yet. Be the first to share!</p>
-									</div>
-								)}
-							</div>
-						</motion.div>
-					)}
-				</AnimatePresence>
+							{posts.length === 0 && (
+								<div className="text-center py-12 text-gray-500 dark:text-gray-400">
+									<Share2 className="w-12 h-12 mx-auto mb-4 opacity-50" />
+									<p>No posts yet. Be the first to share!</p>
+								</div>
+							)}
+						</div>
+					</motion.div>
+				)}
 
 				{/* Chat Tab */}
-				<AnimatePresence mode="wait">
-					{activeTab === "chat" && (
-						<motion.div
-							key="chat"
-							initial={{ opacity: 0, x: -20 }}
-							animate={{ opacity: 1, x: 0 }}
-							exit={{ opacity: 0, x: 20 }}
-							className="flex flex-col h-[600px] bg-gradient-to-br from-blue-600/20 to-purple-600/20 border-2 border-blue-400/30 rounded-2xl overflow-hidden"
+				{activeTab === "chat" && (
+					<motion.div
+						key="chat"
+						initial={{ opacity: 0, x: -20 }}
+						animate={{ opacity: 1, x: 0 }}
+						className="flex flex-col h-[600px] bg-gradient-to-br from-blue-600/20 to-purple-600/20 border-2 border-blue-400/30 rounded-2xl overflow-hidden"
+					>
+						{/* Chat Header */}
+						<div className="p-4 border-b border-white/10 bg-black/20">
+							<h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+								<MessageCircle className="w-5 h-5" />
+								Community Chat
+							</h3>
+							<p className="text-sm text-gray-600 dark:text-gray-400">
+								Connect with fellow meditators
+							</p>
+						</div>
+
+						{/* Messages */}
+						<div 
+							ref={messagesContainerRef}
+							className="flex-1 overflow-y-auto p-4 space-y-4"
 						>
-							{/* Chat Header */}
-							<div className="p-4 border-b border-white/10 bg-black/20">
-								<h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-									<MessageCircle className="w-5 h-5" />
-									Community Chat
-								</h3>
-								<p className="text-sm text-gray-600 dark:text-gray-400">
-									Connect with fellow meditators
-								</p>
-							</div>
-
-							{/* Messages */}
-							<div className="flex-1 overflow-y-auto p-4 space-y-4">
-								{chatMessages.length === 0 ? (
-									<div className="text-center py-12 text-gray-500 dark:text-gray-400">
-										<MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
-										<p>No messages yet. Start the conversation!</p>
-									</div>
-								) : (
-									chatMessages.map((msg) => {
-										const isOwnMessage = msg.author === userName;
-										return (
-											<div
-												key={msg.id}
-												className={`flex gap-3 ${isOwnMessage ? "flex-row-reverse" : ""}`}
-											>
-												<div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 border-2 border-blue-400/30">
-													{getAvatarDisplay(msg.authorAvatar)}
-												</div>
-												<div
-													className={`max-w-[70%] ${
-														isOwnMessage ? "items-end" : "items-start"
-													} flex flex-col`}
-												>
-													<span className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-														{msg.author}
-													</span>
-													<div
-														className={`rounded-2xl px-4 py-2 ${
-															isOwnMessage
-																? "bg-blue-500 text-white"
-																: "bg-white/10 text-gray-900 dark:text-gray-100"
-														}`}
-													>
-														<p className="text-sm whitespace-pre-wrap">{msg.message}</p>
-													</div>
-													<span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-														{formatTimeAgo(msg.timestamp)}
-													</span>
-												</div>
-											</div>
-										);
-									})
-								)}
-								<div ref={chatEndRef} />
-							</div>
-
-							{/* Message Input */}
-							<div className="p-4 border-t border-white/10 bg-black/20">
-								<div className="flex gap-2">
-									<input
-										type="text"
-										value={newMessage}
-										onChange={(e) => setNewMessage(e.target.value)}
-										onKeyPress={(e) => {
-											if (e.key === "Enter" && !e.shiftKey) {
-												e.preventDefault();
-												handleSendMessage();
-											}
-										}}
-										placeholder="Type a message..."
-										className="flex-1 px-4 py-2 rounded-xl border-2 border-blue-400/30 bg-white/5 backdrop-blur-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/50"
-									/>
-									<Button
-										onClick={handleSendMessage}
-										variant="classic"
-										size="3"
-										className="bg-blue-500 hover:bg-blue-600"
-										disabled={!newMessage.trim()}
-									>
-										<Send className="w-4 h-4" />
-									</Button>
+							{chatMessages.length === 0 ? (
+								<div className="text-center py-12 text-gray-500 dark:text-gray-400">
+									<MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
+									<p>No messages yet. Start the conversation!</p>
 								</div>
+							) : (
+								chatMessages.map((msg) => {
+									const isOwnMessage = msg.author === userName;
+									return (
+										<div
+											key={msg.id}
+											className={`flex gap-3 ${isOwnMessage ? "flex-row-reverse" : ""}`}
+										>
+											<div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 border-2 border-blue-400/30">
+												{getAvatarDisplay(msg.authorAvatar)}
+											</div>
+											<div
+												className={`max-w-[70%] ${
+													isOwnMessage ? "items-end" : "items-start"
+												} flex flex-col`}
+											>
+												<span className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+													{msg.author}
+												</span>
+												<div
+													className={`rounded-2xl px-4 py-2 ${
+														isOwnMessage
+															? "bg-blue-500 text-white"
+															: "bg-white/10 text-gray-900 dark:text-gray-100"
+													}`}
+												>
+													<p className="text-sm whitespace-pre-wrap">{msg.message}</p>
+												</div>
+												<span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+													{formatTimeAgo(msg.timestamp)}
+												</span>
+											</div>
+										</div>
+									);
+								})
+							)}
+							<div ref={chatEndRef} />
+						</div>
+
+						{/* Message Input */}
+						<div className="p-4 border-t border-white/10 bg-black/20">
+							<div className="flex gap-2">
+								<input
+									type="text"
+									value={newMessage}
+									onChange={(e) => setNewMessage(e.target.value)}
+									onKeyPress={(e) => {
+										if (e.key === "Enter" && !e.shiftKey) {
+											e.preventDefault();
+											handleSendMessage();
+										}
+									}}
+									placeholder="Type a message..."
+									className="flex-1 px-4 py-2 rounded-xl border-2 border-blue-400/30 bg-white/5 backdrop-blur-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/50"
+								/>
+								<Button
+									onClick={handleSendMessage}
+									variant="classic"
+									size="3"
+									className="bg-blue-500 hover:bg-blue-600"
+									disabled={!newMessage.trim()}
+								>
+									<Send className="w-4 h-4" />
+								</Button>
 							</div>
-						</motion.div>
-					)}
-				</AnimatePresence>
+						</div>
+					</motion.div>
+				)}
 			</motion.div>
 		</div>
 	);
